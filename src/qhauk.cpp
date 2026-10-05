@@ -9,6 +9,7 @@
 
 #include <algorithm>
 
+#include "qhaukmockpositionsource.h"
 #include "utility/loghandler.h"
 
 using namespace Qt::Literals::StringLiterals;
@@ -17,12 +18,15 @@ namespace {
 Q_LOGGING_CATEGORY(lcPosition, "qhauk.position", QtDebugMsg)
 }
 
-// allowAutoPause on ios this requires a backport of https://github.com/qt/qtpositioning/commit/aa3be9b00421e2bf7acaa6f65367b79391a1b695.patch
-// or probably Qt 6.13
 QHauk::QHauk(QObject *parent)
     : QObject(parent)
-    , m_locationSource(QGeoPositionInfoSource::createDefaultSource({{u"allowAutoPause"_s, false}}, this))
+    , m_locationSource(QHaukMockPositionSource::createFromEnvironment(this))
 {
+    if (!m_locationSource) {
+        // allowAutoPause on ios this requires a backport of https://github.com/qt/qtpositioning/commit/aa3be9b00421e2bf7acaa6f65367b79391a1b695.patch
+        // or probably Qt 6.13
+        m_locationSource = QGeoPositionInfoSource::createDefaultSource({{u"allowAutoPause"_s, false}}, this);
+    }
     if (!m_locationSource) {
         qCWarning(lcPosition) << u"Failed to create position info source";
     } else {
