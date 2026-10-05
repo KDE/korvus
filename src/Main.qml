@@ -45,6 +45,11 @@ ApplicationWindow {
         property: "shareType"
         value: AppSettings.shareType
     }
+    Binding {
+        target: session
+        property: "duration"
+        value: AppSettings.duration
+    }
 
     Connections {
         target: session
@@ -141,49 +146,7 @@ ApplicationWindow {
                         rowSpacing: 12
 
                         Label {
-                            visible: AppSettings.shareType !== QHaukSession.JoinGroup
                             text: qsTr("Duration")
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            visible: AppSettings.shareType !== QHaukSession.JoinGroup
-                            SpinBox {
-                                id: shareDuration
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: window.touchTarget
-                                from: 1
-                                to: 999
-                                editable: true
-                                inputMethodHints: Qt.ImhDigitsOnly
-                                // session.duration is in minutes, the spin box shows it in the selected unit
-                                onValueModified: session.duration = value * unit.currentValue
-                            }
-
-                            ComboBox {
-                                id: unit
-                                Layout.preferredHeight: window.touchTarget
-                                implicitContentWidthPolicy: ComboBox.WidestText
-                                // the style's background enforces a large implicit width, size to the content instead
-                                Layout.preferredWidth: implicitContentWidth + leftPadding + rightPadding
-                                model: ListModel {
-                                    ListElement {
-                                        text: qsTr("minutes")
-                                        factor: 1
-                                    }
-                                    ListElement {
-                                        text: qsTr("hours")
-                                        factor: 60
-                                    }
-                                }
-                                textRole: "text"
-                                valueRole: "factor"
-                                onActivated: session.duration = shareDuration.value * currentValue
-                                Component.onCompleted: {
-                                    currentIndex = session.duration % 60 === 0 ? 1 : 0;
-                                    shareDuration.value = session.duration / valueAt(currentIndex);
-                                }
-                            }
                         }
 
                         Label {
@@ -207,6 +170,46 @@ ApplicationWindow {
                             currentIndex: AppSettings.shareType
                             onActivated: index => AppSettings.shareType = index
                         }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            SpinBox {
+                                id: shareDuration
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: window.touchTarget
+                                from: 1
+                                to: 999
+                                editable: true
+                                inputMethodHints: Qt.ImhDigitsOnly
+                                // the duration is in minutes, the spin box shows it in the selected unit
+                                onValueModified: AppSettings.duration = value * unit.currentValue
+                            }
+
+                            ComboBox {
+                                id: unit
+                                Layout.preferredHeight: window.touchTarget
+                                implicitContentWidthPolicy: ComboBox.WidestText
+                                // the style's background enforces a large implicit width, size to the content instead
+                                Layout.preferredWidth: implicitContentWidth + leftPadding + rightPadding
+                                model: ListModel {
+                                    ListElement {
+                                        text: qsTr("minutes")
+                                        factor: 1
+                                    }
+                                    ListElement {
+                                        text: qsTr("hours")
+                                        factor: 60
+                                    }
+                                }
+                                textRole: "text"
+                                valueRole: "factor"
+                                onActivated: AppSettings.duration = shareDuration.value * currentValue
+                                Component.onCompleted: {
+                                    currentIndex = AppSettings.duration % 60 === 0 ? 1 : 0;
+                                    shareDuration.value = AppSettings.duration / valueAt(currentIndex);
+                                }
+                            }
+                        }
+
                         Label {
                             text: qsTr("Pin")
                             visible: AppSettings.shareType === QHaukSession.JoinGroup
