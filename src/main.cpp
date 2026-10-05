@@ -34,8 +34,9 @@ int main(int argc, char *argv[])
 #ifdef Q_DEBUG
     Utility::LogHandler::install();
 #endif
-
+#ifdef Q_OS_DARWIN
     QQuickStyle::setStyle("iOS");
+#endif
 
     QLocationPermission permission;
     permission.setAccuracy(QLocationPermission::Precise);
