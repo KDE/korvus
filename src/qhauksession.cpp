@@ -114,6 +114,7 @@ public:
     QHaukPositionHistory *m_userPositions = nullptr;
     QList<QHaukPositionHistory *> m_groupPositions;
     qreal m_lastPositionFetchTime = 0;
+    OCC::Utility::ChronoElapsedTimer m_lastPositionPost;
     std::chrono::minutes m_duration = 1h;
     QHaukSession::ShareType m_shareType = QHaukSession::ShareType::Solo;
     QString m_pin;
@@ -137,8 +138,9 @@ void QHaukSessionPrivate::onPositionUpdated(const QGeoPositionInfo &info)
     if (result != QHaukPositionHistory::AppendResult::Rejected) {
         Q_EMIT q->positionsChanged();
     }
-    // only post if the change was noteworthy
-    if (result == QHaukPositionHistory::AppendResult::Appended) {
+    // only post if the change was noteworthy or once a minute to indicate we are still alive
+    if (result == QHaukPositionHistory::AppendResult::Appended || m_lastPositionPost.duration() > 1min) {
+        m_lastPositionPost.reset();
         qCDebug(lcPosition) << u"Position updated:" << info.coordinate().latitude() << info.coordinate().longitude() << info.timestamp() << u"speed:"
                             << m_userPositions->speed() << u"accuracy:" << m_userPositions->accuracy();
         m_haukApi->postLocation(m_session.session(), info.coordinate().latitude(), info.coordinate().longitude(), info.timestamp().toUTC().toSecsSinceEpoch(),
