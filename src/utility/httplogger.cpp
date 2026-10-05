@@ -113,10 +113,13 @@ void logHttp(const QByteArray &verb, HttpContext *ctx, QJsonObject &&header, QIO
                 // should we close it again?
                 device->open(QIODevice::ReadOnly);
             }
-            Q_ASSERT(device->pos() == 0);
-            QString data = QString::fromUtf8(device->peek(PeekSize));
-            if (PeekSize < contentLength) {
-                data += QStringLiteral("...(%1 bytes elided)").arg(QString::number(contentLength - PeekSize));
+            QString data;
+            if (device->isOpen()) {
+                Q_ASSERT(device->pos() == 0);
+                data = QString::fromUtf8(device->peek(PeekSize));
+                if (PeekSize < contentLength) {
+                    data += QStringLiteral("...(%1 bytes elided)").arg(QString::number(contentLength - PeekSize));
+                }
             }
             body[QStringLiteral("data")] = data;
         } else {
