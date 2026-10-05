@@ -262,8 +262,8 @@ void QHaukSession::requestGroupPositionsUpdate()
                     const QJsonArray memberPoints = memberPointsValue.toArray();
                     entry->positions.reserve(entry->positions.size() + memberPoints.size());
                     bool memberUpdated = false;
-                    for (const auto &[index, pointValue] : std::ranges::views::enumerate(memberPoints)) {
-                        const QJsonArray point = pointValue.toArray();
+                    for (qsizetype index = 0; index < memberPoints.size(); ++index) {
+                        const QJsonArray point = memberPoints.at(index).toArray();
                         if (point.size() < 6) {
                             qCWarning(lcSession) << u"Ignoring malformed point for" << name << point;
                             continue;
