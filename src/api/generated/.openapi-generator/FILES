@@ -1,0 +1,15 @@
+.openapi-generator-ignore
+client/README.md
+client/adoptionflag.cpp
+client/adoptionflag.h
+client/config.cmake.in
+client/doc/Doxyfile.in
+client/groupshare.cpp
+client/groupshare.h
+client/haukapi.cpp
+client/haukapi.h
+client/qhauk_clientexports.h
+client/sharemetadata.cpp
+client/sharemetadata.h
+client/soloshare.cpp
+client/soloshare.h

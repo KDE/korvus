@@ -1,0 +1,544 @@
+openapi: 3.0.3
+info:
+  title: Hauk PHP Backend API
+  version: 1.6.2
+  description: |
+    API contract derived from bilde2910/Hauk backend-php at commit
+    6b3d8dcbec0c4f6e64d5b72966c16d7fff35177f.
+
+    POST endpoints accept application/x-www-form-urlencoded bodies, not JSON.
+    Authentication is supplied as form fields when creating a session; subsequent
+    writes use its secret sid. Share IDs and group PINs are distinct from session IDs.
+
+    Successful writes start with OK followed by LF-separated fields and a final LF.
+    Application errors usually return HTTP 200 with a human-readable body instead
+    of OK. Error messages are localized using Accept-Language (English fallback).
+    Missing POST fields produce "Missing data!\n". Some authentication errors omit
+    the final LF. Clients must inspect the body, not just the HTTP status.
+
+    The PHP code does not set Content-Type for text responses; text/html is the
+    usual PHP default, although server configuration may change it. This definition
+    uses text/* for these bodies. Successful fetch responses explicitly use text/json.
+servers:
+  - url: https://{host}{basePath}/api
+    description: Set the host and installation path for your Hauk server.
+    variables:
+      host:
+        default: hauk.example.com
+      basePath:
+        default: ''
+        description: Installation path without a trailing slash, e.g. /hauk.
+externalDocs:
+  description: Upstream PHP API at the documented revision
+  url: https://github.com/bilde2910/Hauk/tree/6b3d8dcbec0c4f6e64d5b72966c16d7fff35177f/backend-php/api
+paths:
+  /create.php:
+    post:
+      operationId: createSession
+      summary: Create a solo share, create a group, or join a group
+      description: |
+        mod=0 creates a solo share; mod=1 creates a group and requires nic;
+        mod=2 joins a group and requires nic and pin. Only solo shares support
+        encryption. With e2e enabled, salt is required. pwd is required by all
+        supported authentication modes; usr is additionally required for htpasswd
+        and LDAP authentication. These are form credentials, not HTTP Basic auth.
+
+        Duration and interval must not exceed the server's max_duration (default
+        86400 seconds); interval must be at least min_interval (default 1 second).
+        These limits are configurable. An unavailable, disallowed, or invalid
+        custom lid silently falls back to a generated link ID.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateRequest'
+            examples:
+              solo:
+                value: {pwd: example-password, dur: 3600, int: 5}
+              group:
+                value: {pwd: example-password, dur: 3600, int: 5, mod: 1, nic: Alice}
+              join:
+                value: {pwd: example-password, dur: 3600, int: 5, mod: 2, nic: Bob, pin: '123456'}
+      responses:
+        '200':
+          description: |
+            Solo creation and group joining return lines: OK, sid, view URL, share ID.
+            Group creation returns: OK, sid, view URL, group PIN, share ID.
+            Errors include missing data, authentication/configuration failures,
+            duration/interval limits, unsupported mode, invalid group PIN, and
+            unsupported group encryption.
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/*:
+              schema:
+                type: string
+              examples:
+                soloOrJoin:
+                  value: "OK\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nhttps://hauk.example.com/?ABCD-EFGH\nABCD-EFGH\n"
+                group:
+                  value: "OK\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nhttps://hauk.example.com/?ABCD-EFGH\n123456\nABCD-EFGH\n"
+                error:
+                  value: "Incorrect password!\n"
+  /post.php:
+    post:
+      operationId: postLocation
+      summary: Append a location to a session
+      description: |
+        Plain sessions accept numeric coordinates and Unix time in seconds.
+        Encrypted sessions accept opaque strings for all location fields and
+        require iv. Optional encrypted fields default to null; no coordinate
+        validation is performed for encrypted sessions.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+      responses:
+        '200':
+          description: |
+            Success lines: OK, view URL template containing literal %s, comma-separated
+            target share IDs. Replace %s with a target ID to form its view URL.
+            Errors include missing data, expired session, and invalid coordinates.
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/*:
+              schema:
+                type: string
+              examples:
+                success:
+                  value: "OK\nhttps://hauk.example.com/?%s\nABCD-EFGH,IJKL-MNOP\n"
+                error:
+                  value: "Invalid location!\n"
+  /fetch.php:
+    get:
+      operationId: fetchLocations
+      summary: Fetch cached locations for a share
+      description: |
+        Uses a public share ID, not a session ID. Solo points are a list; group
+        points normally map nicknames to lists. Only the server's retained points
+        are returned (max_cached_pts controls retention).
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: query
+          required: true
+          description: Share ID returned by create.php or new-link.php.
+          schema:
+            $ref: '#/components/schemas/ShareId'
+        - name: since
+          in: query
+          description: |
+            Return points with a timestamp strictly greater than this Unix time
+            in seconds. Omit to fetch all cached points. For encrypted shares,
+            upstream compares floatval of the encrypted timestamp string; it
+            cannot filter by the decrypted time. Omit since for encrypted shares.
+          schema:
+            type: number
+            format: double
+      responses:
+        '200':
+          description: Share data, or a plain-text Invalid session error when id is missing.
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SoloShare'
+                  - $ref: '#/components/schemas/GroupShare'
+              examples:
+                solo:
+                  value:
+                    type: 0
+                    expire: 1800003600
+                    serverTime: 1800000001.25
+                    interval: 5
+                    points: [[52.52, 13.405, 1800000000.5, 0, 8.0, null]]
+                    encrypted: false
+                    salt: null
+                encrypted:
+                  value:
+                    type: 0
+                    expire: 1800003600
+                    serverTime: 1800000001.25
+                    interval: 5
+                    points: [[iv-string, encrypted-lat, encrypted-lon, encrypted-time, null, null, null]]
+                    encrypted: true
+                    salt: salt-string
+                group:
+                  value:
+                    type: 1
+                    expire: 1800003600
+                    serverTime: 1800000001.25
+                    interval: 5
+                    points:
+                      Alice: [[52.52, 13.405, 1800000000.5, 0, 8.0, null]]
+                      Bob: []
+            text/*:
+              schema:
+                type: string
+              example: "Invalid session!\n"
+        '404':
+          description: |
+            Share not found/expired, or its solo host session no longer exists.
+            The missing-host case sends a text error with Content-Type text/json.
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/*:
+              schema:
+                type: string
+              example: "Invalid session!\n"
+            text/json:
+              schema:
+                type: string
+              example: "Invalid session!\n"
+  /new-link.php:
+    post:
+      operationId: createShareLink
+      summary: Attach an additional solo share to an existing session
+      description: The new share inherits the session's expiration time and location data.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [sid, ado]
+              properties:
+                sid:
+                  $ref: '#/components/schemas/SessionId'
+                ado:
+                  $ref: '#/components/schemas/AdoptionFlag'
+      responses:
+        '200':
+          description: 'Success lines: OK, view URL, share ID. Errors: missing data or expired session.'
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/*:
+              schema:
+                type: string
+              examples:
+                success:
+                  value: "OK\nhttps://hauk.example.com/?IJKL-MNOP\nIJKL-MNOP\n"
+                error:
+                  value: "Session expired!\n"
+  /adopt.php:
+    post:
+      operationId: adoptShare
+      summary: Add an adoptable solo share's host to a group
+      description: |
+        Requires an existing adopting session, the source share ID, a nickname,
+        and the destination group's PIN. The source must allow adoption and must
+        not be encrypted. The source host continues posting to its original share.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [sid, nic, aid, pin]
+              properties:
+                sid:
+                  $ref: '#/components/schemas/SessionId'
+                nic:
+                  type: string
+                  description: Nickname for the adopted host in the destination group.
+                aid:
+                  $ref: '#/components/schemas/ShareId'
+                pin:
+                  $ref: '#/components/schemas/GroupPin'
+      responses:
+        '200':
+          description: |
+            OK followed by LF on success. Errors include missing data, expired
+            adopting session or missing destination group, source share not found,
+            adoption disallowed, and encrypted source share.
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/*:
+              schema:
+                type: string
+              examples:
+                success:
+                  value: "OK\n"
+                error:
+                  value: "The host of the given share does not permit adoption!\n"
+  /stop.php:
+    post:
+      operationId: stopSharing
+      summary: End a session or remove one share membership
+      description: |
+        Without lid, ends the session and cleans up its shares. With lid, ends
+        that solo share or removes the session from that group while preserving
+        the session. Unknown sessions and unowned links are ignored and return OK.
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [sid]
+              properties:
+                sid:
+                  $ref: '#/components/schemas/SessionId'
+                lid:
+                  $ref: '#/components/schemas/ShareId'
+      responses:
+        '200':
+          description: OK followed by LF, or Missing data if sid is absent.
+          headers:
+            X-Hauk-Version:
+              $ref: '#/components/headers/BackendVersion'
+          content:
+            text/*:
+              schema:
+                type: string
+              examples:
+                success:
+                  value: "OK\n"
+                missingData:
+                  value: "Missing data!\n"
+components:
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      description: Preferred language for human-readable errors; English is the fallback.
+      schema:
+        type: string
+        example: en
+  headers:
+    BackendVersion:
+      description: Backend version reported by the PHP endpoint.
+      schema:
+        type: string
+        example: 1.6.2
+  schemas:
+    SessionId:
+      type: string
+      description: Secret session ID returned by create.php (64 lowercase hexadecimal characters).
+      example: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    ShareId:
+      type: string
+      description: Public link/share ID; format depends on server settings and custom link requests.
+      example: ABCD-EFGH
+    GroupPin:
+      type: string
+      description: Six-digit PIN identifying the destination group.
+      pattern: '^[0-9]{6}$'
+      example: '123456'
+    AdoptionFlag:
+      type: integer
+      enum: [0, 1]
+      description: 1 allows the solo share to be adopted into a group; 0 disallows adoption.
+    CreateRequest:
+      type: object
+      required: [dur, int, pwd]
+      properties:
+        dur:
+          type: integer
+          description: Sharing duration in seconds, subject to the server's max_duration.
+          example: 3600
+        int:
+          type: number
+          format: double
+          description: Update interval in seconds, subject to min_interval and max_duration.
+          example: 5
+        pwd:
+          type: string
+          format: password
+          writeOnly: true
+          description: Server password, or the user's password for htpasswd/LDAP.
+        usr:
+          type: string
+          description: Required for htpasswd and LDAP authentication.
+        mod:
+          type: integer
+          enum: [0, 1, 2]
+          default: 0
+          description: 0 creates a solo share; 1 creates a group; 2 joins a group.
+        nic:
+          type: string
+          description: Required nickname for mod=1 or mod=2.
+        pin:
+          $ref: '#/components/schemas/GroupPin'
+        ado:
+          allOf:
+            - $ref: '#/components/schemas/AdoptionFlag'
+          default: 0
+        e2e:
+          type: integer
+          enum: [0, 1]
+          default: 0
+          description: Enable end-to-end encryption; supported only for mod=0.
+        salt:
+          type: string
+          description: PBKDF2 salt, required when e2e=1; stored and returned verbatim.
+        lid:
+          type: string
+          description: |
+            Requested custom link ID for mod=0 or mod=1. Only ASCII letters,
+            digits, underscores and hyphens are accepted. Ignored when invalid
+            or disallowed by server configuration, reservations, or availability.
+          example: my-share
+    PostRequest:
+      type: object
+      required: [lat, lon, time, sid]
+      properties:
+        sid:
+          $ref: '#/components/schemas/SessionId'
+        lat:
+          description: Latitude in degrees (-90 to 90), or encrypted latitude text.
+          oneOf:
+            - type: number
+              minimum: -90
+              maximum: 90
+            - type: string
+        lon:
+          description: Longitude in degrees (-180 to 180), or encrypted longitude text.
+          oneOf:
+            - type: number
+              minimum: -180
+              maximum: 180
+            - type: string
+        time:
+          description: Unix timestamp in seconds (fractions allowed), or encrypted timestamp text.
+          oneOf:
+            - type: number
+              format: double
+            - type: string
+        spd:
+          description: Speed in metres per second, or encrypted text. Omission stores null.
+          oneOf:
+            - type: number
+            - type: string
+        acc:
+          description: Accuracy in metres, or encrypted text. Omission stores null.
+          oneOf:
+            - type: number
+            - type: string
+        prv:
+          description: |
+            Plain provider flag: 1 is stored as 1; any other value or omission
+            becomes 0. For encrypted sessions, opaque text; omission stores null.
+          oneOf:
+            - type: integer
+              enum: [0, 1]
+            - type: string
+        iv:
+          type: string
+          description: Initialization vector, required for encrypted sessions; ignored otherwise.
+    PlainPoint:
+      type: array
+      minItems: 6
+      maxItems: 6
+      description: |
+        Positional tuple [latitude, longitude, Unix time in seconds, provider,
+        accuracy in metres or null, speed in metres/second or null]. Provider
+        is integer 0 or 1. OpenAPI 3.0 cannot enforce per-position tuple types;
+        only positions 4 and 5 may be null.
+      items:
+        type: number
+        nullable: true
+      example: [52.52, 13.405, 1800000000.5, 0, 8.0, null]
+    EncryptedPoint:
+      type: array
+      minItems: 7
+      maxItems: 7
+      description: |
+        Positional tuple [iv, latitude, longitude, time, provider, accuracy, speed].
+        Values are opaque strings. Only the last three positions may be null.
+        OpenAPI 3.0 cannot enforce per-position tuple types.
+      items:
+        type: string
+        nullable: true
+      example: [iv-string, encrypted-lat, encrypted-lon, encrypted-time, null, null, null]
+    PointList:
+      type: array
+      items:
+        oneOf:
+          - $ref: '#/components/schemas/PlainPoint'
+          - $ref: '#/components/schemas/EncryptedPoint'
+    ShareMetadata:
+      type: object
+      required: [type, expire, serverTime, interval, points]
+      properties:
+        type:
+          type: integer
+          enum: [0, 1]
+          description: 0 for solo shares, 1 for group shares.
+        expire:
+          type: integer
+          format: int64
+          description: Share expiration as Unix time in seconds.
+        serverTime:
+          type: number
+          format: double
+          description: Current server Unix time in seconds, including fractions.
+        interval:
+          type: number
+          format: double
+          description: Update interval in seconds; the smallest active host interval for groups.
+    SoloShare:
+      allOf:
+        - $ref: '#/components/schemas/ShareMetadata'
+        - type: object
+          required: [encrypted, salt]
+          properties:
+            type:
+              type: integer
+              enum: [0]
+            points:
+              allOf:
+                - $ref: '#/components/schemas/PointList'
+              description: PlainPoint entries if encrypted=false; EncryptedPoint entries otherwise.
+            encrypted:
+              type: boolean
+            salt:
+              type: string
+              nullable: true
+              description: PBKDF2 salt supplied at creation; normally null for unencrypted shares.
+    GroupShare:
+      allOf:
+        - $ref: '#/components/schemas/ShareMetadata'
+        - type: object
+          properties:
+            type:
+              type: integer
+              enum: [1]
+            points:
+              description: |
+                Nickname-to-point-list map. PHP serializes this as an array when
+                nicknames are contiguous integer keys starting at 0, or when no
+                active hosts remain (empty array). Normal group hosts use plain
+                points; the list schema also accommodates encrypted stored points.
+              oneOf:
+                - type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/PointList'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/PointList'
