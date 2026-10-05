@@ -146,10 +146,6 @@ ApplicationWindow {
                         rowSpacing: 12
 
                         Label {
-                            text: qsTr("Duration")
-                        }
-
-                        Label {
                             text: qsTr("Nickname")
                         }
                         TextField {
@@ -169,6 +165,10 @@ ApplicationWindow {
                             model: [qsTr("Solo share"), qsTr("Groupshare"), qsTr("Join groupshare")]
                             currentIndex: AppSettings.shareType
                             onActivated: index => AppSettings.shareType = index
+                        }
+
+                        Label {
+                            text: qsTr("Duration")
                         }
                         RowLayout {
                             Layout.fillWidth: true
