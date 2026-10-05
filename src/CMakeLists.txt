@@ -69,8 +69,8 @@ qt_add_qml_module(qhauk_app
         VERSION 1.0
         QML_FILES
         AppSettings.qml
+        HaukMap.qml
         Main.qml
-        Map.qml
         SettingsView.qml
         TouchMapView.qml
 )

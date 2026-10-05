@@ -50,7 +50,7 @@ ApplicationWindow {
         target: session
         function onIsSharingChanged() {
             if (session.isSharing) {
-                mainView.push("Map.qml", {
+                mainView.push("HaukMap.qml", {
                     "session": session
                 });
             }
@@ -254,7 +254,7 @@ ApplicationWindow {
                         visible: session.isSharing
                         text: qsTr("Show Map")
                         font.bold: true
-                        onClicked: mainView.push("Map.qml", {
+                        onClicked: mainView.push("HaukMap.qml", {
                             "session": session
                         })
                     }
