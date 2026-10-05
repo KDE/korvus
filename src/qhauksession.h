@@ -23,7 +23,7 @@ class QHaukSession : public QObject
     Q_PROPERTY(bool isSharing READ isSharing NOTIFY isSharingChanged FINAL)
     Q_PROPERTY(QString shareId READ shareId NOTIFY isSharingChanged FINAL)
 
-    Q_PROPERTY(QHaukPosition position READ position NOTIFY groupPositionsChanged FINAL)
+    Q_PROPERTY(QHaukPositionHistory positions READ positions NOTIFY positionsChanged FINAL)
     Q_PROPERTY(QList<QHaukPositionHistory> groupPositions READ groupPositions NOTIFY groupPositionsChanged FINAL)
     Q_PROPERTY(int duration READ durationInt WRITE setDurationInt NOTIFY durationChanged FINAL)
     Q_PROPERTY(ShareType shareType READ shareType WRITE setShareType NOTIFY shareTypeChanged FINAL)
@@ -49,9 +49,9 @@ public:
     QString shareId() const;
 
     /**
-     * The position of the user
+     * The positions of the user
      */
-    QHaukPosition position() const;
+    const QHaukPositionHistory &positions() const;
 
     /**
      *  All positions of the group including the user's position
@@ -69,6 +69,7 @@ public:
     QString error() const;
 
 Q_SIGNALS:
+    void positionsChanged();
     void groupPositionsChanged();
     void isSharingChanged();
     void durationChanged();

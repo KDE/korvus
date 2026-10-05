@@ -19,6 +19,129 @@ Page {
     readonly property int pageMargin: 16
     readonly property int maxContentWidth: 600
 
+    // Trail of past positions of one member
+    component MemberTrail: MapPolyline {
+        required property qHaukPositionHistory history
+
+        z: 1
+        visible: history.positions.length > 1
+        path: history.positions.map(p => p.position)
+        line.width: 3
+        line.color: history.color
+        opacity: 0.7
+    }
+
+    // Marker placed at the latest known position of one member
+    component MemberMarker: MapQuickItem {
+        id: memberItem
+        required property qHaukPositionHistory history
+        required property Map map
+
+        readonly property var lastPosition: history.positions.length > 0 ? history.positions[history.positions.length - 1] : undefined
+        readonly property bool isMoving: !!lastPosition && lastPosition.speed > 0
+        // Direction of travel in degrees from north, as reported by the position source,
+        // otherwise derived from the last two recorded points (the server doesn't share the direction)
+        readonly property real heading: {
+            if (lastPosition && lastPosition.direction >= 0) {
+                return lastPosition.direction;
+            }
+            return history.positions.length > 1 ? history.positions[history.positions.length - 2].position.azimuthTo(history.positions[history.positions.length - 1].position) : 0;
+        }
+        // Accuracy (meters) converted to screen pixels, re-evaluated whenever the zoom changes
+        readonly property real accuracyRadius: {
+            map.zoomLevel;
+            if (!lastPosition || !(lastPosition.accuracy > 0)) {
+                return 0;
+            }
+            const center = map.fromCoordinate(lastPosition.position, false);
+            const edge = map.fromCoordinate(lastPosition.position.atDistanceAndAzimuth(lastPosition.accuracy, 90), false);
+            return Math.hypot(edge.x - center.x, edge.y - center.y);
+        }
+
+        z: 2
+        visible: history.positions.length > 0
+        coordinate: lastPosition ? lastPosition.position : QtPositioning.coordinate()
+        anchorPoint.x: sourceItem.width / 2
+        anchorPoint.y: sourceItem.height / 2
+
+        sourceItem: Item {
+            width: Math.max(marker.width, accuracyCircle.width)
+            height: width
+
+            Rectangle {
+                id: accuracyCircle
+                anchors.centerIn: parent
+                width: memberItem.accuracyRadius * 2
+                height: width
+                radius: width / 2
+                visible: width > marker.width
+                color: Qt.rgba(memberItem.history.color.r, memberItem.history.color.g, memberItem.history.color.b, 0.2)
+                border.color: Qt.rgba(memberItem.history.color.r, memberItem.history.color.g, memberItem.history.color.b, 0.5)
+                border.width: 1
+            }
+
+            Item {
+                id: marker
+                anchors.centerIn: parent
+                width: memberItem.isMoving ? 32 : 16
+                height: width
+
+                Rectangle {
+                    anchors.fill: parent
+                    visible: !memberItem.isMoving
+                    radius: width / 2
+                    color: memberItem.history.color
+                    border.color: "white"
+                    border.width: 2
+                }
+
+                // Arrow pointing up (north), rotated to the heading relative to the map bearing
+                Shape {
+                    anchors.fill: parent
+                    visible: memberItem.isMoving
+                    rotation: memberItem.heading - memberItem.map.bearing
+                    preferredRendererType: Shape.CurveRenderer
+
+                    ShapePath {
+                        fillColor: memberItem.history.color
+                        strokeColor: "white"
+                        strokeWidth: 2
+                        joinStyle: ShapePath.RoundJoin
+                        startX: marker.width / 2
+                        startY: 1
+                        PathLine {
+                            x: marker.width - 2
+                            y: marker.height - 2
+                        }
+                        PathLine {
+                            x: marker.width / 2
+                            y: marker.height * 0.7
+                        }
+                        PathLine {
+                            x: 2
+                            y: marker.height - 2
+                        }
+                        PathLine {
+                            x: marker.width / 2
+                            y: 1
+                        }
+                    }
+                }
+            }
+
+            Label {
+                anchors.horizontalCenter: marker.horizontalCenter
+                anchors.bottom: marker.top
+                anchors.bottomMargin: 2
+                // speed is reported in m/s
+                text: memberItem.isMoving ? qsTr("%1 (%2 km/h)").arg(memberItem.history.name).arg(Math.round(memberItem.lastPosition.speed * 3.6)) : memberItem.history.name
+                font.bold: true
+                style: Text.Outline
+                styleColor: "white"
+            }
+        }
+    }
+
     Timer {
         id: groupPosTimer
         interval: 1000 * 10
@@ -83,6 +206,26 @@ Page {
             clip: true
             model: page.session.isSharing ? page.session.groupPositions : []
 
+            // The user is not part of groupPositions, resumes following the user's position
+            header: Item {
+                // spacing does not apply to the header
+                width: userButton.width + memberList.spacing
+                height: memberList.height
+
+                Button {
+                    id: userButton
+                    readonly property qHaukPositionHistory history: page.session.positions
+
+                    height: parent.height
+                    text: history.name
+                    enabled: history.positions.length > 0
+                    palette.button: history.color
+                    Accessible.name: qsTr("Center map on %1").arg(history.name)
+                    onClicked: mapView.following = true
+                }
+            }
+            headerPositioning: ListView.InlineHeader
+
             delegate: Button {
                 required property qHaukPositionHistory modelData
 
@@ -118,21 +261,16 @@ Page {
                 }
             }
             map.zoomLevel: 15
-            followCoordinate: page.session.position.position
+            followCoordinate: page.session.positions.lastKnownPositions.position
 
-            // Trail of past positions per group member, declared first so the markers draw on top
+            // Trail of past positions per group member, the markers draw on top (z)
             MapItemView {
                 parent: mapView.map
                 model: page.session.isSharing ? page.session.groupPositions : []
 
-                delegate: MapPolyline {
+                delegate: MemberTrail {
                     required property qHaukPositionHistory modelData
-
-                    visible: modelData.positions.length > 1
-                    path: modelData.positions.map(p => p.position)
-                    line.width: 3
-                    line.color: modelData.color
-                    opacity: 0.7
+                    history: modelData
                 }
             }
 
@@ -141,107 +279,26 @@ Page {
                 parent: mapView.map
                 model: page.session.isSharing ? page.session.groupPositions : []
 
-                delegate: MapQuickItem {
-                    id: memberItem
+                delegate: MemberMarker {
                     required property qHaukPositionHistory modelData
-
-                    readonly property var lastPosition: modelData.positions.length > 0 ? modelData.positions[modelData.positions.length - 1] : undefined
-                    readonly property bool isMoving: !!lastPosition && lastPosition.speed > 0
-                    // Direction of travel in degrees from north, derived from the last two recorded points
-                    readonly property real heading: modelData.positions.length > 1 ? modelData.positions[modelData.positions.length - 2].position.azimuthTo(modelData.positions[modelData.positions.length - 1].position) : 0
-                    // Accuracy (meters) converted to screen pixels, re-evaluated whenever the zoom changes
-                    readonly property real accuracyRadius: {
-                        mapView.map.zoomLevel;
-                        if (!lastPosition || !(lastPosition.accuracy > 0)) {
-                            return 0;
-                        }
-                        const center = mapView.map.fromCoordinate(lastPosition.position, false);
-                        const edge = mapView.map.fromCoordinate(lastPosition.position.atDistanceAndAzimuth(lastPosition.accuracy, 90), false);
-                        return Math.hypot(edge.x - center.x, edge.y - center.y);
-                    }
-
-                    visible: modelData.positions.length > 0
-                    coordinate: lastPosition ? lastPosition.position : QtPositioning.coordinate()
-                    anchorPoint.x: sourceItem.width / 2
-                    anchorPoint.y: sourceItem.height / 2
-
-                    sourceItem: Item {
-                        width: Math.max(marker.width, accuracyCircle.width)
-                        height: width
-
-                        Rectangle {
-                            id: accuracyCircle
-                            anchors.centerIn: parent
-                            width: memberItem.accuracyRadius * 2
-                            height: width
-                            radius: width / 2
-                            visible: width > marker.width
-                            color: Qt.rgba(memberItem.modelData.color.r, memberItem.modelData.color.g, memberItem.modelData.color.b, 0.2)
-                            border.color: Qt.rgba(memberItem.modelData.color.r, memberItem.modelData.color.g, memberItem.modelData.color.b, 0.5)
-                            border.width: 1
-                        }
-
-                        Item {
-                            id: marker
-                            anchors.centerIn: parent
-                            width: memberItem.isMoving ? 32 : 16
-                            height: width
-
-                            Rectangle {
-                                anchors.fill: parent
-                                visible: !memberItem.isMoving
-                                radius: width / 2
-                                color: memberItem.modelData.color
-                                border.color: "white"
-                                border.width: 2
-                            }
-
-                            // Arrow pointing up (north), rotated to the heading relative to the map bearing
-                            Shape {
-                                anchors.fill: parent
-                                visible: memberItem.isMoving
-                                rotation: memberItem.heading - mapView.map.bearing
-                                preferredRendererType: Shape.CurveRenderer
-
-                                ShapePath {
-                                    fillColor: memberItem.modelData.color
-                                    strokeColor: "white"
-                                    strokeWidth: 2
-                                    joinStyle: ShapePath.RoundJoin
-                                    startX: marker.width / 2
-                                    startY: 1
-                                    PathLine {
-                                        x: marker.width - 2
-                                        y: marker.height - 2
-                                    }
-                                    PathLine {
-                                        x: marker.width / 2
-                                        y: marker.height * 0.7
-                                    }
-                                    PathLine {
-                                        x: 2
-                                        y: marker.height - 2
-                                    }
-                                    PathLine {
-                                        x: marker.width / 2
-                                        y: 1
-                                    }
-                                }
-                            }
-                        }
-
-                        Label {
-                            anchors.horizontalCenter: marker.horizontalCenter
-                            anchors.bottom: marker.top
-                            anchors.bottomMargin: 2
-                            // speed is reported in m/s
-                            text: memberItem.isMoving ? qsTr("%1 (%2 km/h)").arg(memberItem.modelData.name).arg(Math.round(memberItem.lastPosition.speed * 3.6)) : memberItem.modelData.name
-                            font.bold: true
-                            style: Text.Outline
-                            styleColor: "white"
-                        }
-                    }
+                    history: modelData
+                    map: mapView.map
                 }
+            }
+
+            // The user's own position is updated far more often than the group positions,
+            // it is kept out of groupPositions so its updates don't recreate the group delegates
+            MemberTrail {
+                history: page.session.positions
+                visible: page.session.isSharing && history.positions.length > 1
+                Component.onCompleted: mapView.map.addMapItem(this)
+            }
+
+            MemberMarker {
+                history: page.session.positions
+                map: mapView.map
+                visible: page.session.isSharing && history.positions.length > 0
+                Component.onCompleted: mapView.map.addMapItem(this)
             }
         }
 

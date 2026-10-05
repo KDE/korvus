@@ -111,6 +111,7 @@ public:
     HaukCreateReply m_session;
     std::unique_ptr<Hauk::HaukApi> m_haukApi;
     QString m_nickName;
+    QHaukPositionHistory m_userPositions;
     QList<QHaukPositionHistory> m_groupPositions;
     qreal m_lastPositionFetchTime = 0;
     std::chrono::minutes m_duration = 1h;
@@ -133,9 +134,9 @@ void QHaukSessionPrivate::onPositionUpdated(const QGeoPositionInfo &info)
     }
     Q_Q(QHaukSession);
     const QHaukPosition position(info);
-    const auto result = groupEntry(m_nickName).append(position);
+    const auto result = m_userPositions.append(position);
     if (result != QHaukPositionHistory::AppendResult::Rejected) {
-        Q_EMIT q->groupPositionsChanged();
+        Q_EMIT q->positionsChanged();
     }
     // only post if the change was noteworthy
     if (result == QHaukPositionHistory::AppendResult::Appended) {
@@ -208,13 +209,10 @@ QString QHaukSession::shareId() const
     return d->m_session.shareId();
 }
 
-QHaukPosition QHaukSession::position() const
+const QHaukPositionHistory &QHaukSession::positions() const
 {
     Q_D(const QHaukSession);
-    // const lookup, a non-const one would detach the list QML might share
-    const auto &groupPositions = d->m_groupPositions;
-    const auto it = std::ranges::find(groupPositions, d->m_nickName, &QHaukPositionHistory::name);
-    return it != groupPositions.cend() ? it->lastKnownPositions() : QHaukPosition();
+    return d->m_userPositions;
 }
 
 const QList<QHaukPositionHistory> &QHaukSession::groupPositions() const
@@ -246,6 +244,10 @@ void QHaukSession::requestGroupPositionsUpdate()
                 // Null accuracy and speed are mapped to 0 by toDouble()
                 const auto points = summary.getPointsValue();
                 for (const auto &[name, memberPointsValue] : points.asKeyValueRange()) {
+                    if (name == d->m_nickName) {
+                        // Ignore our own points, we track our own position separately.
+                        continue;
+                    }
                     auto &entry = d->groupEntry(name);
                     if (!memberPointsValue.isArray()) {
                         if (!memberPointsValue.isNull()) {
@@ -364,7 +366,8 @@ void QHaukSession::startSharing()
     d->m_lastPositionFetchTime = 0;
     // keep the name used for this session, the setting might change while sharing
     d->m_nickName = hauk->nickName();
-    d->groupEntry(d->m_nickName);
+    d->m_userPositions = QHaukPositionHistory(d->m_nickName, {});
+    Q_EMIT positionsChanged();
     // The interval is sent in (fractional) seconds, never send 0: the server rejects anything below its min_interval (default 1s)
     const auto *locationSource = hauk->locationSource();
     const std::chrono::duration<double> updateInterval = std::max({std::chrono::milliseconds(locationSource->updateInterval()),

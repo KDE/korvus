@@ -12,6 +12,7 @@ class QHaukPosition
     Q_PROPERTY(QGeoCoordinate position MEMBER position FINAL)
     Q_PROPERTY(qreal accuracy MEMBER accuracy FINAL)
     Q_PROPERTY(qreal speed MEMBER speed FINAL)
+    Q_PROPERTY(qreal direction MEMBER direction FINAL)
     QML_VALUE_TYPE(qHaukPosition)
 public:
     QHaukPosition() = default;
@@ -23,4 +24,6 @@ public:
     QGeoCoordinate position = {};
     qreal accuracy = {};
     qreal speed = {};
+    // direction of travel in degrees from north, -1 if unknown
+    qreal direction = -1;
 };
