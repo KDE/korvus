@@ -104,15 +104,15 @@ public:
         Q_EMIT q->errorChanged();
         Q_EMIT q->isSharingChanged();
     }
-    QHaukPositionHistory &groupEntry(const QString &name);
+    QHaukPositionHistory *groupEntry(const QString &name);
 
     QHaukSession *q_ptr;
 
     HaukCreateReply m_session;
     std::unique_ptr<Hauk::HaukApi> m_haukApi;
     QString m_nickName;
-    QHaukPositionHistory m_userPositions;
-    QList<QHaukPositionHistory> m_groupPositions;
+    QHaukPositionHistory *m_userPositions = nullptr;
+    QList<QHaukPositionHistory *> m_groupPositions;
     qreal m_lastPositionFetchTime = 0;
     std::chrono::minutes m_duration = 1h;
     QHaukSession::ShareType m_shareType = QHaukSession::ShareType::Solo;
@@ -133,17 +133,17 @@ void QHaukSessionPrivate::onPositionUpdated(const QGeoPositionInfo &info)
         return;
     }
     Q_Q(QHaukSession);
-    const QHaukPosition position(info);
-    const auto result = m_userPositions.append(position);
+    const auto result = m_userPositions->append(info);
     if (result != QHaukPositionHistory::AppendResult::Rejected) {
         Q_EMIT q->positionsChanged();
     }
     // only post if the change was noteworthy
     if (result == QHaukPositionHistory::AppendResult::Appended) {
         qCDebug(lcPosition) << u"Position updated:" << info.coordinate().latitude() << info.coordinate().longitude() << info.timestamp() << u"speed:"
-                            << position.speed << u"accuracy:" << position.accuracy;
+                            << m_userPositions->speed() << u"accuracy:" << m_userPositions->accuracy();
         m_haukApi->postLocation(m_session.session(), info.coordinate().latitude(), info.coordinate().longitude(), info.timestamp().toUTC().toSecsSinceEpoch(),
-            {}, position.speed, position.accuracy, {}, q, [bgTask = makeBackgroundTaskScopePost(), this](const QRestReply &reply, const QString &summary) {
+            {}, m_userPositions->speed(), m_userPositions->accuracy(), {}, q,
+            [bgTask = makeBackgroundTaskScopePost(), this](const QRestReply &reply, const QString &summary) {
                 if (reply.isSuccess()) {
                     HaukPostReply haukPostReply(summary);
                     Q_ASSERT(haukPostReply.status() != HaukPostReply::Status::Invalid);
@@ -159,12 +159,13 @@ void QHaukSessionPrivate::onPositionUpdated(const QGeoPositionInfo &info)
     }
 }
 
-QHaukPositionHistory &QHaukSessionPrivate::groupEntry(const QString &name)
+QHaukPositionHistory *QHaukSessionPrivate::groupEntry(const QString &name)
 {
+    Q_Q(QHaukSession);
     // groups are small, a linear search is cheaper than maintaining a map next to the list
     auto it = std::ranges::find(m_groupPositions, name, &QHaukPositionHistory::name);
     if (it == m_groupPositions.end()) {
-        return m_groupPositions.emplace_back(name, QList<QHaukPosition>{});
+        return m_groupPositions.emplace_back(new QHaukPositionHistory(name, QList<QGeoCoordinate>{}, q));
     }
     return *it;
 }
@@ -176,6 +177,7 @@ QHaukSession::QHaukSession(QHauk *parent)
     Q_D(QHaukSession);
     // The session object is reused across start/stop, set up everything that is not session specific once
     d->m_haukApi->setRestAccessManager(new QRestAccessManager(new QHaukNam(this), this));
+    d->m_userPositions = new QHaukPositionHistory(parent->nickName(), {}, this);
     // onPositionUpdated ignores updates while not sharing
     connect(parent->locationSource(), &QGeoPositionInfoSource::positionUpdated, this, [d](const QGeoPositionInfo &info) { d->onPositionUpdated(info); });
 }
@@ -209,13 +211,13 @@ QString QHaukSession::shareId() const
     return d->m_session.shareId();
 }
 
-const QHaukPositionHistory &QHaukSession::positions() const
+QHaukPositionHistory *QHaukSession::positions() const
 {
     Q_D(const QHaukSession);
     return d->m_userPositions;
 }
 
-const QList<QHaukPositionHistory> &QHaukSession::groupPositions() const
+const QList<QHaukPositionHistory *> &QHaukSession::groupPositions() const
 {
     Q_D(const QHaukSession);
     return d->m_groupPositions;
@@ -248,7 +250,7 @@ void QHaukSession::requestGroupPositionsUpdate()
                         // Ignore our own points, we track our own position separately.
                         continue;
                     }
-                    auto &entry = d->groupEntry(name);
+                    auto *entry = d->groupEntry(name);
                     if (!memberPointsValue.isArray()) {
                         if (!memberPointsValue.isNull()) {
                             qCWarning(lcSession) << u"Ignoring malformed points for" << name << memberPointsValue;
@@ -256,17 +258,29 @@ void QHaukSession::requestGroupPositionsUpdate()
                         continue;
                     }
                     const QJsonArray memberPoints = memberPointsValue.toArray();
-                    entry.positions.reserve(entry.positions.size() + memberPoints.size());
-                    for (const auto &pointValue : memberPoints) {
+                    entry->positions.reserve(entry->positions.size() + memberPoints.size());
+                    bool memberUpdated = false;
+                    for (const auto &[index, pointValue] : std::ranges::views::enumerate(memberPoints)) {
                         const QJsonArray point = pointValue.toArray();
                         if (point.size() < 6) {
                             qCWarning(lcSession) << u"Ignoring malformed point for" << name << point;
                             continue;
                         }
-                        updated |=
-                            entry.append(QHaukPosition(QGeoCoordinate(point[0].toDouble(), point[1].toDouble()), point[4].toDouble(), point[5].toDouble()))
+                        memberUpdated |= entry->append(QGeoCoordinate(point[0].toDouble(), point[1].toDouble()), point[4].toDouble())
                             != QHaukPositionHistory::AppendResult::Rejected;
+
+                        if (memberUpdated && index == memberPoints.size() - 1) {
+                            entry->setAccuracy(point[4].toDouble());
+                            entry->setSpeed(point[5].toDouble());
+                        }
                     }
+                    // the server doesn't share the direction, derive it from the last two recorded points
+                    if (memberUpdated) {
+                        if (memberUpdated && entry->positions.size() > 1) {
+                            entry->setDirection(entry->positions.at(entry->positions.size() - 2).azimuthTo(entry->positions.last()));
+                        }
+                    }
+                    updated |= memberUpdated;
                 }
                 qCDebug(lcSession) << "Fetched group positions:" << d->m_groupPositions.size() << u"members";
                 if (updated) {
@@ -362,11 +376,17 @@ void QHaukSession::startSharing()
         }
         return ad;
     }();
+    // QML might still reference the old histories until it processed the change signals, delete them later
+    for (auto *history : std::as_const(d->m_groupPositions)) {
+        history->deleteLater();
+    }
     d->m_groupPositions.clear();
+    Q_EMIT groupPositionsChanged();
     d->m_lastPositionFetchTime = 0;
     // keep the name used for this session, the setting might change while sharing
     d->m_nickName = hauk->nickName();
-    d->m_userPositions = QHaukPositionHistory(d->m_nickName, {});
+    d->m_userPositions->deleteLater();
+    d->m_userPositions = new QHaukPositionHistory(d->m_nickName, {}, this);
     Q_EMIT positionsChanged();
     // The interval is sent in (fractional) seconds, never send 0: the server rejects anything below its min_interval (default 1s)
     const auto *locationSource = hauk->locationSource();

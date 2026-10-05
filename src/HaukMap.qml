@@ -21,11 +21,11 @@ Page {
 
     // Trail of past positions of one member
     component MemberTrail: MapPolyline {
-        required property qHaukPositionHistory history
+        required property QHaukPositionHistory history
 
         z: 1
         visible: history.positions.length > 1
-        path: history.positions.map(p => p.position)
+        path: history.positions.map(p => p)
         line.width: 3
         line.color: history.color
         opacity: 0.7
@@ -34,33 +34,25 @@ Page {
     // Marker placed at the latest known position of one member
     component MemberMarker: MapQuickItem {
         id: memberItem
-        required property qHaukPositionHistory history
+        required property QHaukPositionHistory history
         required property Map map
 
-        readonly property var lastPosition: history.positions.length > 0 ? history.positions[history.positions.length - 1] : undefined
-        readonly property bool isMoving: !!lastPosition && lastPosition.speed > 0
-        // Direction of travel in degrees from north, as reported by the position source,
-        // otherwise derived from the last two recorded points (the server doesn't share the direction)
-        readonly property real heading: {
-            if (lastPosition && lastPosition.direction >= 0) {
-                return lastPosition.direction;
-            }
-            return history.positions.length > 1 ? history.positions[history.positions.length - 2].position.azimuthTo(history.positions[history.positions.length - 1].position) : 0;
-        }
+        readonly property var lastPosition: history.lastKnownPosition
+        readonly property bool isMoving: history.speed > 0
         // Accuracy (meters) converted to screen pixels, re-evaluated whenever the zoom changes
         readonly property real accuracyRadius: {
             map.zoomLevel;
-            if (!lastPosition || !(lastPosition.accuracy > 0)) {
+            if (history.accuracy < 0) {
                 return 0;
             }
-            const center = map.fromCoordinate(lastPosition.position, false);
-            const edge = map.fromCoordinate(lastPosition.position.atDistanceAndAzimuth(lastPosition.accuracy, 90), false);
+            const center = map.fromCoordinate(lastPosition, false);
+            const edge = map.fromCoordinate(lastPosition.atDistanceAndAzimuth(history.accuracy, 90), false);
             return Math.hypot(edge.x - center.x, edge.y - center.y);
         }
 
         z: 2
         visible: history.positions.length > 0
-        coordinate: lastPosition ? lastPosition.position : QtPositioning.coordinate()
+        coordinate: lastPosition
         anchorPoint.x: sourceItem.width / 2
         anchorPoint.y: sourceItem.height / 2
 
@@ -99,7 +91,7 @@ Page {
                 Shape {
                     anchors.fill: parent
                     visible: memberItem.isMoving
-                    rotation: memberItem.heading - memberItem.map.bearing
+                    rotation: memberItem.history.direction - memberItem.map.bearing
                     preferredRendererType: Shape.CurveRenderer
 
                     ShapePath {
@@ -134,7 +126,7 @@ Page {
                 anchors.bottom: marker.top
                 anchors.bottomMargin: 2
                 // speed is reported in m/s
-                text: memberItem.isMoving ? qsTr("%1 (%2 km/h)").arg(memberItem.history.name).arg(Math.round(memberItem.lastPosition.speed * 3.6)) : memberItem.history.name
+                text: memberItem.isMoving ? qsTr("%1 (%2 km/h)").arg(memberItem.history.name).arg(Math.round(memberItem.history.speed * 3.6)) : memberItem.history.name
                 font.bold: true
                 style: Text.Outline
                 styleColor: "white"
@@ -214,7 +206,7 @@ Page {
 
                 Button {
                     id: userButton
-                    readonly property qHaukPositionHistory history: page.session.positions
+                    readonly property QHaukPositionHistory history: page.session.positions
 
                     height: parent.height
                     text: history.name
@@ -227,7 +219,7 @@ Page {
             headerPositioning: ListView.InlineHeader
 
             delegate: Button {
-                required property qHaukPositionHistory modelData
+                required property QHaukPositionHistory modelData
 
                 height: memberList.height
                 text: modelData.name
@@ -236,7 +228,7 @@ Page {
                 Accessible.name: qsTr("Center map on %1").arg(modelData.name)
                 onClicked: {
                     mapView.following = false;
-                    mapView.centerOn(modelData.positions[modelData.positions.length - 1].position);
+                    mapView.centerOn(modelData.lastKnownPosition);
                 }
             }
         }
@@ -261,7 +253,7 @@ Page {
                 }
             }
             map.zoomLevel: 15
-            followCoordinate: page.session.positions.lastKnownPositions.position
+            followCoordinate: page.session.positions.lastKnownPosition
 
             // Trail of past positions per group member, the markers draw on top (z)
             MapItemView {
@@ -269,7 +261,7 @@ Page {
                 model: page.session.isSharing ? page.session.groupPositions : []
 
                 delegate: MemberTrail {
-                    required property qHaukPositionHistory modelData
+                    required property QHaukPositionHistory modelData
                     history: modelData
                 }
             }
@@ -280,7 +272,7 @@ Page {
                 model: page.session.isSharing ? page.session.groupPositions : []
 
                 delegate: MemberMarker {
-                    required property qHaukPositionHistory modelData
+                    required property QHaukPositionHistory modelData
                     history: modelData
                     map: mapView.map
                 }

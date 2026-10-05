@@ -2,24 +2,29 @@
 // SPDX-FileCopyrightText: 2026 Hannah von Reth <vonreth@kde.org>
 #pragma once
 
-#include "qhaukposition.h"
 
 #include <QColor>
+#include <QGeoCoordinate>
 #include <QList>
 #include <QString>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-class QHaukPositionHistory
+
+class QGeoPositionInfo;
+class QHaukPositionHistory : public QObject
 {
-    Q_GADGET
-    Q_PROPERTY(QString name MEMBER name FINAL)
-    Q_PROPERTY(QColor color MEMBER color FINAL)
-    Q_PROPERTY(QList<QHaukPosition> positions MEMBER positions FINAL)
-    Q_PROPERTY(QHaukPosition lastKnownPositions READ lastKnownPositions FINAL)
-    QML_VALUE_TYPE(qHaukPositionHistory)
+    Q_OBJECT
+    Q_PROPERTY(QString name MEMBER name CONSTANT FINAL)
+    Q_PROPERTY(QColor color MEMBER color CONSTANT FINAL)
+    Q_PROPERTY(QList<QGeoCoordinate> positions MEMBER positions NOTIFY positionsChanged FINAL)
+    Q_PROPERTY(QGeoCoordinate lastKnownPosition READ lastKnownPosition NOTIFY positionsChanged FINAL)
+    Q_PROPERTY(qreal accuracy READ accuracy WRITE setAccuracy NOTIFY accuracyChanged FINAL)
+    Q_PROPERTY(qreal speed READ speed WRITE setSpeed NOTIFY speedChanged FINAL)
+    Q_PROPERTY(qreal direction READ direction WRITE setDirection NOTIFY directionChanged FINAL)
+    QML_ELEMENT
 public:
-    QHaukPositionHistory() = default;
-    QHaukPositionHistory(const QString &name, const QList<QHaukPosition> &positions);
+    QHaukPositionHistory(QObject *parent = nullptr);
+    QHaukPositionHistory(const QString &name, const QList<QGeoCoordinate> &positions, QObject *parent = nullptr);
 
     /**
      * Minimal distance in meters a position has to move to be recorded as a new point
@@ -37,14 +42,34 @@ public:
      * or the reported accuracy the last point is replaced instead.
      * This keeps the latest position exact while stationary periods collapse into two points.
      */
-    AppendResult append(const QHaukPosition &position);
+    AppendResult append(const QGeoCoordinate &position, qreal accuracy);
+    AppendResult append(const QGeoPositionInfo &info);
 
     /**
      * The latest position, or an invalid position if none is known yet
      */
-    QHaukPosition lastKnownPositions() const;
+    const QGeoCoordinate &lastKnownPosition() const;
 
     QString name = {};
     QColor color = {};
-    QList<QHaukPosition> positions = {};
+    QList<QGeoCoordinate> positions = {};
+
+    void setAccuracy(qreal accuracy);
+    void setSpeed(qreal speed);
+    void setDirection(qreal direction);
+
+    qreal accuracy() const;
+    qreal speed() const;
+    qreal direction() const;
+
+Q_SIGNALS:
+    void positionsChanged();
+    void directionChanged();
+    void accuracyChanged();
+    void speedChanged();
+
+private:
+    qreal m_accuracy = {};
+    qreal m_speed = {};
+    qreal m_direction = -1;
 };

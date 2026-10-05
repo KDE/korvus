@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 Hannah von Reth <vonreth@kde.org>
 #pragma once
 
-#include "qhaukposition.h"
 #include "qhaukpositionhistory.h"
 
 #include <QObject>
@@ -23,8 +22,8 @@ class QHaukSession : public QObject
     Q_PROPERTY(bool isSharing READ isSharing NOTIFY isSharingChanged FINAL)
     Q_PROPERTY(QString shareId READ shareId NOTIFY isSharingChanged FINAL)
 
-    Q_PROPERTY(QHaukPositionHistory positions READ positions NOTIFY positionsChanged FINAL)
-    Q_PROPERTY(QList<QHaukPositionHistory> groupPositions READ groupPositions NOTIFY groupPositionsChanged FINAL)
+    Q_PROPERTY(QHaukPositionHistory *positions READ positions NOTIFY positionsChanged FINAL)
+    Q_PROPERTY(QList<QHaukPositionHistory *> groupPositions READ groupPositions NOTIFY groupPositionsChanged FINAL)
     Q_PROPERTY(int duration READ durationInt WRITE setDurationInt NOTIFY durationChanged FINAL)
     Q_PROPERTY(ShareType shareType READ shareType WRITE setShareType NOTIFY shareTypeChanged FINAL)
     Q_PROPERTY(QString pin READ pin WRITE setPin NOTIFY pinChanged FINAL)
@@ -51,12 +50,12 @@ public:
     /**
      * The positions of the user
      */
-    const QHaukPositionHistory &positions() const;
+    QHaukPositionHistory *positions() const;
 
     /**
      *  All positions of the group including the user's position
      */
-    const QList<QHaukPositionHistory> &groupPositions() const;
+    const QList<QHaukPositionHistory *> &groupPositions() const;
 
     bool isSharing() const;
 

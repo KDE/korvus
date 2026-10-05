@@ -36,7 +36,6 @@ add_library(qhauk STATIC
     haukreply.cpp
     qhauk.cpp
     qhaukmockpositionsource.cpp
-    qhaukposition.cpp
     qhaukpositionhistory.cpp
     qhauksession.cpp
 )
