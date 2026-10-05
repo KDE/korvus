@@ -47,13 +47,13 @@ QHaukSession *QHauk::createSession()
         return nullptr;
     }
     auto *out = new QHaukSession(this);
-    connect(out, &QHaukSession::destroyed, [out, this] {
+    connect(out, &QHaukSession::destroyed, this, [out, this] {
         m_sessions.removeOne(out);
         if (m_sessions.isEmpty()) {
             m_locationSource->stopUpdates();
         }
     });
-    connect(out, &QHaukSession::isSharingChanged, [this] {
+    connect(out, &QHaukSession::isSharingChanged,  this,[this] {
         if (std::ranges::find_if(m_sessions, [](const auto *session) { return session->isSharing(); }) != m_sessions.end()) {
             qCDebug(lcPosition) << u"Starting location updates";
             m_locationSource->startUpdates();
