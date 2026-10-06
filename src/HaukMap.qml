@@ -301,11 +301,11 @@ Page {
             Layout.alignment: Qt.AlignHCenter
             Layout.margins: page.pageMargin
             Layout.preferredHeight: page.touchTarget + 4
-            text: qsTr("Stop Sharing")
+            text: page.session.shareType === QHaukSession.Follower ? qsTr("Stop following") : qsTr("Stop Sharing")
             icon.name: "media-playback-stop"
             font.bold: true
             onClicked: {
-                page.session.stopSharing();
+                page.session.stop();
             }
         }
         RowLayout {
@@ -314,7 +314,7 @@ Page {
             enabled: session.isSharing
             spacing: 12
             Button {
-                text: qsTr("🌐Open in Browser")
+                text: qsTr("Open in Browser")
                 //icon: ""
                 flat: true
                 Layout.fillWidth: true

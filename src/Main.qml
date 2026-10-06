@@ -24,6 +24,7 @@ ApplicationWindow {
     readonly property int maxContentWidth: 600
 
     property QHaukSession session: QHauk.createSession()
+    property list<QHaukSession> followSessions
 
     Binding {
         target: QHauk
@@ -239,58 +240,151 @@ ApplicationWindow {
                         highlighted: !session.isSharing
                         onClicked: {
                             if (session.isSharing) {
-                                session.stopSharing();
+                                session.stop();
                             } else {
                                 session.startSharing();
                             }
                         }
                     }
-                    Label {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: window.touchTarget + 4
-                        visible: session.error.length !== 0
-                        text: qsTr("An error occurred: '%1'").arg(session.error)
-                    }
+
                     Button {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: window.touchTarget + 4
+                        Layout.preferredHeight: window.touchTarget
                         visible: session.isSharing
                         text: qsTr("Show Map")
-                        font.bold: true
+                        icon.name: "map-flat"
                         onClicked: mainView.push("HaukMap.qml", {
                             "session": session
                         })
                     }
 
-                    ColumnLayout {
-                        visible: session.isSharing
+                    Label {
+                        Layout.fillWidth: true
+                        visible: session.error.length !== 0
+                        text: qsTr("An error occurred: '%1'").arg(session.error)
+                        color: "red"
+                        wrapMode: Text.Wrap
+                    }
+
+                    MenuSeparator {
                         Layout.fillWidth: true
                         Layout.topMargin: 8
-                        spacing: 4
-                        Label {
-                            text: session.shareType === QHaukSession.Solo ? qsTr("ShareID: %1").arg(session.shareId) : qsTr("ShareID: %1 PIN: %2").arg(session.shareId).arg(session.pin)
-                            font.bold: true
-                            font.pixelSize: Qt.application.font.pixelSize * 1.2
-                            wrapMode: Text.Wrap
-                            Layout.fillWidth: true
-                        }
+                    }
 
-                        Button {
-                            text: qsTr("Open in Browser")
-                            //icon: ""
-                            flat: true
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: window.touchTarget
-                            onClicked: Qt.openUrlExternally(session.url)
-                        }
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Following")
+                        font.bold: true
+                        font.pixelSize: Qt.application.font.pixelSize * 1.2
+                    }
 
-                        Button {
-                            text: qsTr("Copy share id to clipboard")
-                            icon.name: "edit-copy"
-                            flat: true
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: window.touchTarget
-                            onClicked: QHauk.setClipboard(session.shareType === QHaukSession.Solo ? session.shareId : qsTr("You can join my location share %1 PIN: %2").arg(session.shareId).arg(session.pin))
+                    Label {
+                        Layout.fillWidth: true
+                        visible: window.followSessions.length === 0
+                        text: qsTr("You are not following anyone")
+                        opacity: 0.7
+                        wrapMode: Text.Wrap
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: window.followSessions.length !== 0
+                        spacing: 0
+
+                        Repeater {
+                            id: followerButtons
+                            model: window.followSessions
+                            delegate: ItemDelegate {
+                                id: followDelegate
+                                required property QHaukSession modelData
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: window.touchTarget
+                                text: modelData.shareId
+                                font.bold: true
+                                icon.name: "mark-location"
+                                rightPadding: stopFollowing.width
+                                onClicked: mainView.push("HaukMap.qml", {
+                                    "session": modelData
+                                })
+
+                                ToolButton {
+                                    id: stopFollowing
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: window.touchTarget
+                                    height: window.touchTarget
+                                    text: "✕"
+                                    Accessible.name: qsTr("Stop following %1").arg(followDelegate.modelData.shareId)
+                                    onClicked: followDelegate.modelData.stop()
+                                }
+                            }
+                        }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: window.touchTarget
+                        text: qsTr("Follow others")
+                        icon.name: "list-add"
+                        onClicked: {
+                            followIdField.clear();
+                            followDialog.open();
+                        }
+                    }
+                }
+            }
+
+            Dialog {
+                id: followDialog
+                parent: Overlay.overlay
+                anchors.centerIn: parent
+                width: Math.min(window.width - 2 * window.pageMargin, window.maxContentWidth)
+                modal: true
+                title: qsTr("Follow others")
+                standardButtons: Dialog.Ok | Dialog.Cancel
+
+                // only allow accepting a complete share id
+                Component.onCompleted: standardButton(Dialog.Ok).enabled = Qt.binding(() => followIdField.acceptableInput)
+                onOpened: followIdField.forceActiveFocus()
+
+                onAccepted: {
+                    const shareId = followIdField.text.toUpperCase();
+                    const followSession = QHauk.createSession();
+                    followSession.startFollowing(shareId);
+                    // drop the session from the list once it was stopped
+                    followSession.isSharingChanged.connect(() => {
+                        if (!followSession.isSharing) {
+                            window.followSessions = Array.from(window.followSessions).filter(s => s !== followSession);
+                        }
+                    });
+                    window.followSessions.push(followSession);
+                    mainView.push("HaukMap.qml", {
+                        "session": followSession
+                    });
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 8
+
+                    Label {
+                        text: qsTr("Share ID")
+                    }
+                    TextField {
+                        id: followIdField
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: window.touchTarget
+                        verticalAlignment: Text.AlignVCenter
+                        placeholderText: "31BN-MMCB"
+                        inputMethodHints: Qt.ImhUppercaseOnly | Qt.ImhNoPredictiveText
+                        validator: RegularExpressionValidator {
+                            regularExpression: /[A-Za-z0-9]{4}-[A-Za-z0-9]{4}/
+                        }
+                        maximumLength: 9
+                        onAccepted: {
+                            if (acceptableInput) {
+                                followDialog.accept();
+                            }
                         }
                     }
                 }

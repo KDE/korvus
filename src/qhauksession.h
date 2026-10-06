@@ -21,6 +21,7 @@ class QHaukSession : public QObject
     Q_PROPERTY(QUrl url READ url NOTIFY isSharingChanged FINAL)
     Q_PROPERTY(bool isSharing READ isSharing NOTIFY isSharingChanged FINAL)
     Q_PROPERTY(QString shareId READ shareId NOTIFY isSharingChanged FINAL)
+    Q_PROPERTY(QString nickName READ nickName NOTIFY nickNameChanged FINAL)
 
     Q_PROPERTY(QHaukPositionHistory *positions READ positions NOTIFY positionsChanged FINAL)
     Q_PROPERTY(QList<QHaukPositionHistory *> groupPositions READ groupPositions NOTIFY groupPositionsChanged FINAL)
@@ -32,11 +33,7 @@ class QHaukSession : public QObject
     QML_UNCREATABLE("Must create via QHauk")
     QML_ELEMENT
 public:
-    enum class ShareType {
-        Solo,
-        Group,
-        JoinGroup // TODO: can we cover that with Group?
-    };
+    enum class ShareType { Solo, Group, JoinGroup, Follower };
     Q_ENUM(ShareType)
 
     QHaukSession(QHauk *parent);
@@ -46,6 +43,7 @@ public:
     QString pin() const;
     void setPin(const QString &pin);
     QString shareId() const;
+    QString nickName() const;
 
     /**
      * The positions of the user
@@ -68,6 +66,7 @@ public:
     QString error() const;
 
 Q_SIGNALS:
+    void nickNameChanged();
     void positionsChanged();
     void groupPositionsChanged();
     void isSharingChanged();
@@ -78,11 +77,14 @@ Q_SIGNALS:
 
 
 public Q_SLOTS:
-    void stopSharing();
+    void stop();
     void startSharing();
+    void startFollowing(const QString &sessionId);
     void requestGroupPositionsUpdate();
 
 private:
+    void start();
+
     int durationInt() const;
     void setDurationInt(int duration);
 

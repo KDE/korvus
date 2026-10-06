@@ -53,7 +53,7 @@ QHaukSession *QHauk::createSession()
             m_locationSource->stopUpdates();
         }
     });
-    connect(out, &QHaukSession::isSharingChanged,  this,[this] {
+    connect(out, &QHaukSession::isSharingChanged, this, [this] {
         if (std::ranges::find_if(m_sessions, [](const auto *session) { return session->isSharing(); }) != m_sessions.end()) {
             qCDebug(lcPosition) << u"Starting location updates";
             m_locationSource->startUpdates();
