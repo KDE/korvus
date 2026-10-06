@@ -25,6 +25,7 @@ class QHaukSession : public QObject
 
     Q_PROPERTY(QHaukPositionHistory *positions READ positions NOTIFY positionsChanged FINAL)
     Q_PROPERTY(QList<QHaukPositionHistory *> groupPositions READ groupPositions NOTIFY groupPositionsChanged FINAL)
+    Q_PROPERTY(QStringList groupNames READ groupNames NOTIFY groupNamesChanged FINAL)
     Q_PROPERTY(int duration READ durationInt WRITE setDurationInt NOTIFY durationChanged FINAL)
     Q_PROPERTY(ShareType shareType READ shareType WRITE setShareType NOTIFY shareTypeChanged FINAL)
     Q_PROPERTY(QString pin READ pin WRITE setPin NOTIFY pinChanged FINAL)
@@ -54,6 +55,7 @@ public:
      *  All positions of the group including the user's position
      */
     const QList<QHaukPositionHistory *> &groupPositions() const;
+    QStringList groupNames() const;
 
     bool isSharing() const;
 
@@ -69,6 +71,7 @@ Q_SIGNALS:
     void nickNameChanged();
     void positionsChanged();
     void groupPositionsChanged();
+    void groupNamesChanged();
     void isSharingChanged();
     void durationChanged();
     void shareTypeChanged();

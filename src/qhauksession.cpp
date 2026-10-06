@@ -180,7 +180,9 @@ QHaukPositionHistory *QHaukSessionPrivate::groupEntry(const QString &name)
     // groups are small, a linear search is cheaper than maintaining a map next to the list
     auto it = std::ranges::find(m_groupPositions, name, &QHaukPositionHistory::name);
     if (it == m_groupPositions.end()) {
-        return m_groupPositions.emplace_back(new QHaukPositionHistory(name, QList<QGeoCoordinate>{}, q));
+        auto out = m_groupPositions.emplace_back(new QHaukPositionHistory(name, QList<QGeoCoordinate>{}, q));
+        Q_EMIT q->groupNamesChanged();
+        return out;
     }
     return *it;
 }
@@ -243,6 +245,13 @@ const QList<QHaukPositionHistory *> &QHaukSession::groupPositions() const
 {
     Q_D(const QHaukSession);
     return d->m_groupPositions;
+}
+
+QStringList QHaukSession::groupNames() const
+{
+    Q_D(const QHaukSession);
+    auto view = d->m_groupPositions | std::views::transform([](const QHaukPositionHistory *history) { return history->name; });
+    return QStringList {view.cbegin(), view.cend()};
 }
 
 void QHaukSession::requestGroupPositionsUpdate()

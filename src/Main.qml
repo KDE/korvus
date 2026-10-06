@@ -297,9 +297,15 @@ ApplicationWindow {
                             delegate: ItemDelegate {
                                 id: followDelegate
                                 required property QHaukSession modelData
+                                TextMetrics {
+                                    id: elidedGroupName
+                                    text: modelData.groupNames.join(", ")
+                                    elideWidth: followDelegate.width - stopFollowing.width - 50
+                                    elide: Qt.ElideRight
+                                }
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: window.touchTarget
-                                text: modelData.shareId
+                                text: qsTr("%1 (%2)").arg(modelData.shareId).arg(elidedGroupName.elidedText)
                                 font.bold: true
                                 icon.name: "mark-location"
                                 rightPadding: stopFollowing.width
