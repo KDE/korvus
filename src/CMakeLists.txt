@@ -79,3 +79,5 @@ qt_add_qml_module(qhauk_app
 qt_finalize_executable(qhauk_app)
 
 #ecm_finalize_qml_module(qhauk_app DESTINATION ${KDE_INSTALL_QMLDIR})
+
+install(TARGETS qhauk_app DESTINATION ${CMAKE_INSTALL_BINDIR})
