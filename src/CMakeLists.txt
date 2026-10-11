@@ -57,7 +57,9 @@ qt_add_executable(qhauk_app MANUAL_FINALIZATION MACOSX_BUNDLE main.cpp)
 target_link_libraries(qhauk_app PRIVATE qhaukplugin Qt6::Quick Qt6::QuickControls2)
 set_target_properties(qhauk_app
         PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist")
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+            OUTPUT_NAME QHauk
+)
 
 set_source_files_properties(AppSettings.qml PROPERTIES
         QT_QML_SINGLETON_TYPE TRUE
