@@ -25,7 +25,7 @@ include(ECMQmlModule)
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickWidgets QuickControls2 OpenApiCommon Positioning Location)
-if (NOT IOS)
+if (NOT IOS AND NOT ANDROID)
     find_package(Qt6 REQUIRED COMPONENTS OpenApiTools)
 endif()
 qt_standard_project_setup(REQUIRES 6.11)
