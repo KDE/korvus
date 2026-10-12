@@ -11,7 +11,7 @@
 #include "utility/qhauknam.h"
 
 namespace {
-Q_LOGGING_CATEGORY(lcApp, "qhauk.app", QtDebugMsg)
+Q_LOGGING_CATEGORY(lcApp, "korvus", QtDebugMsg)
 }
 
 void start()
@@ -21,7 +21,7 @@ void start()
         engine, &QQmlApplicationEngine::objectCreationFailed, qApp,
         []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
     engine->setNetworkAccessManagerFactory(new QHaukNetworkAccessManagerFactory);
-    engine->loadFromModule("org.kde.hauk.app", "Main");
+    engine->loadFromModule("org.kde.korvus", "Main");
 }
 
 int main(int argc, char *argv[])
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     app.setOrganizationName("KDE");
     app.setOrganizationDomain("org.kde");
-    app.setApplicationName("QHauk");
+    app.setApplicationName("Korvus");
 
 #ifdef Q_DEBUG
     Utility::LogHandler::install();

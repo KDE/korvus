@@ -8,7 +8,7 @@ import QtLocation
 import QtPositioning
 
 import org.kde.hauk 1.0
-import org.kde.hauk.app
+import org.kde.korvus
 
 Page {
     id: page
@@ -245,7 +245,7 @@ Page {
                 // Tile servers require an identifying user agent
                 PluginParameter {
                     name: "osm.useragent"
-                    value: "org.kde.qhauk"
+                    value: "org.kde.korvus"
                 }
                 PluginParameter {
                     name: "osm.mapping.providersrepository.address"

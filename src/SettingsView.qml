@@ -5,7 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 import org.kde.hauk 1.0
-import org.kde.hauk.app
+import org.kde.korvus
 
 Page {
     id: page
@@ -27,6 +27,7 @@ Page {
 
             ToolButton {
                 text: "‹"
+                icon.name: "go-previous"
                 display: AbstractButton.IconOnly
                 font.pixelSize: Qt.application.font.pixelSize * 1.6
                 Layout.preferredWidth: page.touchTarget

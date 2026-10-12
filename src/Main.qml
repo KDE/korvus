@@ -7,7 +7,7 @@ import QtCore
 import QtPositioning
 
 import org.kde.hauk 1.0
-import org.kde.hauk.app
+import org.kde.korvus
 
 ApplicationWindow {
     id: window
@@ -15,7 +15,7 @@ ApplicationWindow {
     width: 390
     height: 844
     visible: true
-    title: qsTr("QHauk")
+    title: qsTr("Korvus")
 
     // Minimum touch target size recommended by Apple HIG / Material guidelines
     readonly property int touchTarget: 48
@@ -73,7 +73,7 @@ ApplicationWindow {
         id: haukView
 
         Page {
-            title: qsTr("QHauk")
+            title: window.title
 
             header: ToolBar {
                 RowLayout {
@@ -81,7 +81,7 @@ ApplicationWindow {
                     spacing: 0
 
                     Label {
-                        text: qsTr("QHauk")
+                        text: window.title
                         font.bold: true
                         font.pixelSize: Qt.application.font.pixelSize * 1.2
                         elide: Text.ElideRight

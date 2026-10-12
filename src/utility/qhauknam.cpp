@@ -17,7 +17,7 @@ QHaukNam::QHaukNam(QObject *parent)
 QNetworkReply *QHaukNam::createRequest(Operation op, const QNetworkRequest &request, QIODevice *outgoingData)
 {
     QNetworkRequest newRequest(request);
-    newRequest.setRawHeader("User-Agent"_ba, "org.kde.qhauk"_ba);
+    newRequest.setRawHeader("User-Agent"_ba, "org.kde.korvus"_ba);
     newRequest.setRawHeader("X-Request-ID"_ba, QUuid::createUuid().toByteArray(QUuid::WithoutBraces));
 
     const auto reply = QNetworkAccessManager::createRequest(op, newRequest, outgoingData);

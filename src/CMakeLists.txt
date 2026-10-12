@@ -53,20 +53,20 @@ qt_add_qml_module(qhauk
 
 #ecm_finalize_qml_module(qhauk DESTINATION ${KDE_INSTALL_QMLDIR})
 
-qt_add_executable(qhauk_app MANUAL_FINALIZATION MACOSX_BUNDLE main.cpp)
-target_link_libraries(qhauk_app PRIVATE qhaukplugin Qt6::Quick Qt6::QuickControls2)
-set_target_properties(qhauk_app
+qt_add_executable(korvus MANUAL_FINALIZATION MACOSX_BUNDLE main.cpp)
+target_link_libraries(korvus PRIVATE qhaukplugin Qt6::Quick Qt6::QuickControls2)
+set_target_properties(korvus
         PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
-            OUTPUT_NAME QHauk
+            OUTPUT_NAME Korvus
 )
 
 set_source_files_properties(AppSettings.qml PROPERTIES
         QT_QML_SINGLETON_TYPE TRUE
 )
 
-qt_add_qml_module(qhauk_app
-        URI org.kde.hauk.app
+qt_add_qml_module(korvus
+        URI org.kde.korvus
         VERSION 1.0
         QML_FILES
         AppSettings.qml
@@ -76,8 +76,8 @@ qt_add_qml_module(qhauk_app
         TouchMapView.qml
 )
 
-qt_finalize_executable(qhauk_app)
+qt_finalize_executable(korvus)
 
 #ecm_finalize_qml_module(qhauk_app DESTINATION ${KDE_INSTALL_QMLDIR})
 
-install(TARGETS qhauk_app DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS korvus DESTINATION ${CMAKE_INSTALL_BINDIR})
