@@ -251,7 +251,7 @@ QStringList QHaukSession::groupNames() const
 {
     Q_D(const QHaukSession);
     auto view = d->m_groupPositions | std::views::transform([](const QHaukPositionHistory *history) { return history->name; });
-    return QStringList {view.cbegin(), view.cend()};
+    return QStringList {view.begin(), view.end()};
 }
 
 void QHaukSession::requestGroupPositionsUpdate()
