@@ -98,7 +98,6 @@ Page {
                 echoMode: TextInput.PasswordEchoOnEdit
                 inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhHiddenText
                 onEditingFinished: AppSettings.password = text
-                onAccepted: mapApiKeyField.forceActiveFocus()
             }
 
             Button {
