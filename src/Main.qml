@@ -6,7 +6,8 @@ import QtQuick.Layouts
 import QtCore
 import QtPositioning
 
-import org.kde.hauk 1.0
+import org.kde.hauk
+import org.kde.hauk.utility
 import org.kde.korvus
 
 ApplicationWindow {
@@ -333,6 +334,7 @@ ApplicationWindow {
                         text: qsTr("Follow others")
                         icon.name: "list-add"
                         onClicked: {
+                            followDialog.followId = "";
                             followIdField.clear();
                             followDialog.open();
                         }
@@ -342,19 +344,36 @@ ApplicationWindow {
 
             Dialog {
                 id: followDialog
+                property string followId
                 parent: Overlay.overlay
                 anchors.centerIn: parent
                 width: Math.min(window.width - 2 * window.pageMargin, window.maxContentWidth)
                 modal: true
+                // On Wayland the clipboard is only handed to the focused window, so a share id is usually
+                // detected by the same click that focuses us. Don't let that press close the dialog again.
+                closePolicy: Popup.CloseOnEscape
                 title: qsTr("Follow others")
-                standardButtons: Dialog.Ok | Dialog.Cancel
+                footer: DialogButtonBox {
+                    Button {
+                        text: qsTr("Start following")
+                        DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+                        // only allow accepting a complete share id
+                        enabled: followDialog.followId.length > 0 || followIdField.acceptableInput
+                    }
+                    Button {
+                        text: qsTr("Abort")
+                        DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+                    }
+                }
 
-                // only allow accepting a complete share id
-                Component.onCompleted: standardButton(Dialog.Ok).enabled = Qt.binding(() => followIdField.acceptableInput)
-                onOpened: followIdField.forceActiveFocus()
+                onOpened: {
+                    if (followIdField.visible) {
+                        followIdField.forceActiveFocus();
+                    }
+                }
 
                 onAccepted: {
-                    const shareId = followIdField.text.toUpperCase();
+                    const shareId = (followId.length > 0 ? followId : followIdField.text).toUpperCase();
                     const followSession = QHauk.createSession();
                     followSession.startFollowing(shareId);
                     // drop the session from the list once it was stopped
@@ -374,10 +393,12 @@ ApplicationWindow {
                     spacing: 8
 
                     Label {
-                        text: qsTr("Share ID")
+                        text: followDialog.followId.length === 0 ? qsTr("Share ID") : qsTr("Share ID %1 discovered").arg(followDialog.followId)
                     }
                     TextField {
                         id: followIdField
+                        visible: followDialog.followId.length === 0
+                        enabled: visible
                         Layout.fillWidth: true
                         Layout.preferredHeight: window.touchTarget
                         verticalAlignment: Text.AlignVCenter
@@ -392,6 +413,21 @@ ApplicationWindow {
                                 followDialog.accept();
                             }
                         }
+                    }
+                }
+
+                ClipboardWatcher {
+                    onHaukIdDetected: id => {
+                        // don't replace an id the user is typing
+                        if (followDialog.opened && followDialog.followId.length === 0) {
+                            return;
+                        }
+                        // nothing to do if we already follow it, or it is our own share
+                        if (id === window.session.shareId || Array.from(window.followSessions).some(s => s.shareId === id)) {
+                            return;
+                        }
+                        followDialog.followId = id;
+                        followDialog.open();
                     }
                 }
             }

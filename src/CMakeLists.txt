@@ -44,7 +44,7 @@ if (IOS)
     find_library(UIKIT_LIBRARY UIKit)
     target_link_libraries(qhauk PRIVATE ${UIKIT_LIBRARY})
 endif()
-target_link_libraries(qhauk PUBLIC qhauk_client utility Qt6::Core Qt6::Positioning Qt6::Quick Qt6::Location)
+target_link_libraries(qhauk PRIVATE utility qhauk_client PUBLIC Qt6::Core Qt6::Positioning Qt6::Quick Qt6::Location)
 qt_add_qml_module(qhauk
         URI org.kde.hauk
         VERSION 1.0
@@ -54,7 +54,7 @@ qt_add_qml_module(qhauk
 #ecm_finalize_qml_module(qhauk DESTINATION ${KDE_INSTALL_QMLDIR})
 
 qt_add_executable(korvus MANUAL_FINALIZATION MACOSX_BUNDLE main.cpp)
-target_link_libraries(korvus PRIVATE qhaukplugin Qt6::Quick Qt6::QuickControls2)
+target_link_libraries(korvus PRIVATE qhaukplugin utilityplugin Qt6::Quick Qt6::QuickControls2)
 set_target_properties(korvus
         PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
