@@ -295,41 +295,12 @@ Page {
         }
 
         Button {
-            enabled: page.session.isSharing
+            text: qsTr("Copy share information to clipboard")
+            icon.name: "edit-copy"
+            flat: true
             Layout.fillWidth: true
-            Layout.maximumWidth: page.maxContentWidth
-            Layout.alignment: Qt.AlignHCenter
-            Layout.margins: page.pageMargin
-            Layout.preferredHeight: page.touchTarget + 4
-            text: page.session.shareType === QHaukSession.Follower ? qsTr("Stop following") : qsTr("Stop Sharing")
-            icon.name: "media-playback-stop"
-            font.bold: true
-            onClicked: {
-                page.session.stop();
-            }
-        }
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.topMargin: 8
-            enabled: session.isSharing
-            spacing: 12
-            Button {
-                text: qsTr("Open in Browser")
-                //icon: ""
-                flat: true
-                Layout.fillWidth: true
-                Layout.preferredHeight: window.touchTarget
-                onClicked: Qt.openUrlExternally(session.url)
-            }
-
-            Button {
-                text: qsTr("Copy share id to clipboard")
-                icon.name: "edit-copy"
-                flat: true
-                Layout.fillWidth: true
-                Layout.preferredHeight: window.touchTarget
-                onClicked: QHauk.setClipboard(session.shareType === QHaukSession.Solo ? session.shareId : qsTr("You can join my location share %1 PIN: %2").arg(session.shareId).arg(session.pin))
-            }
+            Layout.preferredHeight: window.touchTarget
+            onClicked: QHauk.setClipboard(session.shareType === QHaukSession.Solo ? qsTr("You can follow my location share %1").arg(session.url) : qsTr("You can join my location share %1 PIN: %2").arg(session.url).arg(session.pin))
         }
     }
 }
