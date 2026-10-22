@@ -73,7 +73,7 @@ private:
     UIBackgroundTaskIdentifier m_taskId = UIBackgroundTaskInvalid;
 };
 
-constexpr auto makeBackgroundTaskScopePost()
+auto makeBackgroundTaskScopePost()
 {
     return std::make_unique<ScopedBackgroundTask>(@"QHaukPostLocation");
 }
