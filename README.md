@@ -1,6 +1,6 @@
 # Korvus a KDE client for Hauk location sharing
 
-![Korvus](./logo.png)
+![Korvus](./logo.svg)
 
 [Hauk](https://github.com/bilde2910/Hauk) provides private self-hosted location sharing.
 Korvus allows you to share your location, and displays you and your friends on a map.
